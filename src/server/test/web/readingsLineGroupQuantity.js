@@ -12,7 +12,7 @@ const Unit = require('../../models/Unit');
 const { prepareTest,
     parseExpectedCsv,
     expectReadingToEqualExpected,
-    // createTimeString,
+    createTimeString,
     getUnitId,
     ETERNITY,
     // METER_ID,
@@ -68,6 +68,46 @@ mocha.describe('readings API', () => {
                 // Add LG20 here
 
                 // Add LG21 here
+
+                mocha.it('LG21: should have hourly points for middle readings of 15 + 20 minute for a 60 day period and quantity units & kWh as MJ', async () => {
+                    const unitData = unitDatakWh.concat([
+                        {
+                            // u3
+                            name: 'MJ',
+                            identifier: 'megaJoules',
+                            unitRepresent: Unit.unitRepresentType.QUANTITY,
+                            secInRate: 3600,
+                            typeOfUnit: Unit.unitType.UNIT,
+                            suffix: '',
+                            displayable: Unit.displayableType.ALL,
+                            preferredDisplay: false,
+                            note: 'MJ'
+                        }
+                    ]);
+                    const conversionData = conversionDatakWh.concat([
+                        {
+                            // c2
+                            sourceName: 'kWh',
+                            destinationName: 'MJ',
+                            bidirectional: true,
+                            slope: 3.6,
+                            intercept: 0,
+                            note: 'kWh → MJ'
+                        }
+                    ]);
+
+                    // Load the data into the database
+                    await prepareTest(unitData,conversionData,meterDatakWhGroups,groupDatakWh);
+                    // Get the unit ID since the DB could use any value.
+                    const unitId = await getUnitId('MJ');
+                    // Load the expected response data from the corresponding csv file
+                    const expected = await parseExpectedCsv('src/server/test/web/readingsData/expected_line_group_ri_15-20_mu_kWh_gu_MJ_st_2022-08-25%00#00#00_et_2022-10-24%00#00#00.csv');
+                    // Create a request to the API for unbounded reading times and save the response
+                    const res = await chai.request(app).get(`/api/unitReadings/line/groups/${GROUP_ID}`)
+                        .query({ timeInterval: createTimeString('2022-08-25', '00:00:00', '2022-10-24', '00:00:00'), graphicUnitId: unitId });
+                    // Check that the API reading is equal to what it is expected to equal
+                    expectReadingToEqualExpected(res, expected, GROUP_ID);
+                });
 
             });
         });
